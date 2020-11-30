@@ -1,8 +1,13 @@
 ﻿using basic_auth_api.Entities;
 using basic_auth_api.Helpers;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace basic_auth_api.Services
@@ -12,28 +17,56 @@ namespace basic_auth_api.Services
         // users hardcoded for simplicity, store in a db with hashed passwords in production applications
         private List<User> _users = new List<User>
         {
-            new User { Id = 1, FirstName = "Test", LastName = "User", Username = "test", Password = "test" },
-            new User { Id = 2, FirstName = "Nin", LastName = "Alamo", Username = "ninalamo", Password = "Love2eat!" },
-            new User { Id = 3, FirstName = "User", LastName = "One", Username = "user1", Password = Guid.NewGuid().ToString() },
-            new User { Id = 4, FirstName = "User", LastName = "Two", Username = "user2", Password = Guid.NewGuid().ToString() },
-            new User { Id = 5, FirstName = "User", LastName = "Three", Username = "user3", Password = Guid.NewGuid().ToString() },
+            new User { Id = 1, FirstName = "Test", LastName = "User", Username = "test", Password = "test", Role = Role.User },
+            new User { Id = 2, FirstName = "Nin", LastName = "Alamo", Username = "ninalamo", Password = "Love2eat!", Role = Role.Admin },
+            new User { Id = 3, FirstName = "User", LastName = "One", Username = "user1", Password = Guid.NewGuid().ToString(), Role = Role.User },
+            new User { Id = 4, FirstName = "User", LastName = "Two", Username = "user2", Password = Guid.NewGuid().ToString(), Role = Role.User },
+            new User { Id = 5, FirstName = "User", LastName = "Three", Username = "user3", Password = Guid.NewGuid().ToString() , Role = Role.User},
         };
+
+        private readonly AppSettings _appSettings;
+
+        public UserService(IOptions<AppSettings> appSettings)
+        {
+            _appSettings = appSettings.Value;
+        }
 
         public async Task<User> Authenticate(string username, string password)
         {
-            var user = await Task.Run(() => _users.SingleOrDefault(x => x.Username == username && x.Password == password));
+            var user = _users.SingleOrDefault(x => x.Username == username && x.Password == password);
 
             // return null if user not found
             if (user == null)
                 return null;
 
-            // authentication successful so return user details without password
+            // authentication successful so generate jwt token
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes(_appSettings.Secret);
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new Claim[]
+                {
+                    new Claim(ClaimTypes.Name, user.Id.ToString()),
+                    new Claim(ClaimTypes.Role, user.Role)
+                }),
+                Expires = DateTime.UtcNow.AddDays(7),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            user.Token = tokenHandler.WriteToken(token);
+
             return user.WithoutPassword();
         }
 
         public async Task<IEnumerable<User>> GetAll()
         {
             return await Task.Run(() => _users.WithoutPasswords());
+        }
+
+        public User GetById(int id)
+        {
+            var user = _users.FirstOrDefault(x => x.Id == id);
+            return user.WithoutPassword();
         }
     }
 }

@@ -9,5 +9,6 @@ namespace basic_auth_api.Services
     {
         Task<User> Authenticate(string username, string password);
         Task<IEnumerable<User>> GetAll();
+        User GetById(int id);
     }
 }
