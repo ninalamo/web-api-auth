@@ -15,7 +15,7 @@ using System.Linq;
 using System.Threading.Tasks;
 
 namespace basic_auth_api
-{
+{ 
     public class Startup
     {
         public Startup(IConfiguration configuration)
