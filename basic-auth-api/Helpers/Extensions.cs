@@ -12,7 +12,7 @@ namespace basic_auth_api.Helpers
 
         public static User WithoutPassword(this User user)
         {
-            user.Password = null;
+            //user.Password = null;
             return user;
         }
     }
